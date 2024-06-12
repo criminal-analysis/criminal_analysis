@@ -48,7 +48,7 @@ def join_local_name(safety_center_df, local_name_df):
     merged_df = safety_center_df.merge(local_name_df, left_on='city', right_on='local_name', how='left')
 
     # 중복 행 예외 처리 추가
-    merged_df.drop_duplicates(subset=['lcSn'], keep='second', inplace=True, ignore_index=True)
+    merged_df.drop_duplicates(subset=['lcSn'], keep='first', inplace=True, ignore_index=True)
     return merged_df
 
 def preprocess_zip_codes(zip_code_new_df, zip_code_old_df):
