@@ -1,9 +1,11 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.providers.postgres.operators.postgres import PostgresOperator
 from airflow.providers.amazon.aws.transfers.local_to_s3 import LocalFilesystemToS3Operator
 from airflow.providers.amazon.aws.transfers.s3_to_redshift import S3ToRedshiftOperator
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.utils.dates import days_ago
+from datetime import timedelta
 import requests
 import pandas as pd
 import os
@@ -20,7 +22,7 @@ dag = DAG(
     'api_to_redshift',
     default_args=default_args,
     description='Fetch data from API, process it and load into Redshift',  # DAG 설명
-    schedule_interval='* */10 * * *',  # 10분마다 실행
+    schedule_interval='*/10 * * * *',  # 10분마다 실행
 )
 
 # 데이터 수집 함수
@@ -75,6 +77,21 @@ def upload_to_s3(**kwargs):
     )
     print(f"File uploaded to s3://litchiimg/upload/city_grouped_data.csv")
 
+# 테이블 생성 SQL
+create_police_station_table_sql = """
+CREATE TABLE IF NOT EXISTS hhee2864.police_station_count (
+    경찰서 VARCHAR(256),
+    count INTEGER
+);
+"""
+
+create_city_table_sql = """
+CREATE TABLE IF NOT EXISTS hhee2864.city_count (
+    시도청 VARCHAR(256),
+    count INTEGER
+);
+"""
+
 # 태스크 정의
 fetch_data_task = PythonOperator(
     task_id='fetch_data_from_api',  # 태스크 ID
@@ -93,12 +110,26 @@ upload_to_s3_task = PythonOperator(
     python_callable=upload_to_s3,
     dag=dag,
 )
+#테이블 생성
+# create_police_station_table_task = PostgresOperator(
+#     task_id='create_police_station_table',
+#     postgres_conn_id='redshift_dev_db',  # Redshift 연결 ID
+#     sql=create_police_station_table_sql,  # 실행할 SQL
+#     dag=dag,
+# )
+
+# create_city_table_task = PostgresOperator(
+#     task_id='create_city_table',
+#     postgres_conn_id='redshift_dev_db',  # Redshift 연결 ID
+#     sql=create_city_table_sql,  # 실행할 SQL
+#     dag=dag,
+# )
 
 load_police_station_to_redshift_task = S3ToRedshiftOperator(
     task_id='load_police_station_to_redshift',
     s3_bucket='litchiimg',  # S3 버킷
     s3_key='upload/police_station_grouped_data.csv',  # S3 키
-    schema='public',  # Redshift 스키마
+    schema='hhee2864',  # Redshift 스키마
     table='police_station_count',  # Redshift 테이블
     copy_options=['csv', 'IGNOREHEADER 1'],  # COPY 옵션
     aws_conn_id='aws_default',  # AWS 연결 ID
@@ -110,7 +141,7 @@ load_city_to_redshift_task = S3ToRedshiftOperator(
     task_id='load_city_to_redshift',
     s3_bucket='litchiimg',  # S3 버킷
     s3_key='upload/city_grouped_data.csv',  # S3 키
-    schema='public',  # Redshift 스키마
+    schema='hhee2864',  # Redshift 스키마
     table='city_count',  # Redshift 테이블
     copy_options=['csv', 'IGNOREHEADER 1'],  # COPY 옵션
     aws_conn_id='aws_default',  # AWS 연결 ID
@@ -118,7 +149,7 @@ load_city_to_redshift_task = S3ToRedshiftOperator(
     dag=dag,
 )
 
-# 태스크 순서 설정
-fetch_data_task >> process_data_task >> upload_to_s3_task
-upload_to_s3_task >> load_police_station_to_redshift_task
-upload_to_s3_task >> load_city_to_redshift_task
+# 테이블 생성 태스크 순서 설정
+# fetch_data_task >> process_data_task >> upload_to_s3_task
+# upload_to_s3_task >> create_police_station_table_task >> load_police_station_to_redshift_task
+# upload_to_s3_task >> create_city_table_task >> load_city_to_redshift_task
