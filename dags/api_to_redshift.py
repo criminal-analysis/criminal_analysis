@@ -1,11 +1,9 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from airflow.providers.postgres.operators.postgres import PostgresOperator
 from airflow.providers.amazon.aws.transfers.local_to_s3 import LocalFilesystemToS3Operator
 from airflow.providers.amazon.aws.transfers.s3_to_redshift import S3ToRedshiftOperator
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.utils.dates import days_ago
-from datetime import timedelta
 import requests
 import pandas as pd
 import os
@@ -22,7 +20,7 @@ dag = DAG(
     'api_to_redshift',
     default_args=default_args,
     description='Fetch data from API, process it and load into Redshift',  # DAG 설명
-    schedule_interval='*/10 * * * *',  # 10분마다 실행
+    schedule_interval='* */10 * * *',  # 10분마다 실행
 )
 
 # 데이터 수집 함수
@@ -40,34 +38,42 @@ def fetch_data_from_api(**kwargs):
 # 데이터 가공 함수
 def process_data(**kwargs):
     raw_file_path = '/tmp/raw_data.csv'
-    processed_file_path = '/tmp/processed_data.csv'
+    police_station_grouped_file_path = '/tmp/police_station_grouped_data.csv'
+    city_grouped_file_path = '/tmp/city_grouped_data.csv'
     
     df = pd.read_csv(raw_file_path, encoding='utf-8-sig')
     
     # 경찰서별로 그룹화하고 개수 세기
-    grouped_df = df.groupby('경찰서').size().reset_index(name='count')
+    police_station_grouped_df = df.groupby('경찰서').size().reset_index(name='count')
+    police_station_grouped_df.to_csv(police_station_grouped_file_path, index=False, encoding='utf-8-sig')
+    print(f"Police station grouped data saved to {police_station_grouped_file_path}")
     
-    grouped_df.to_csv(processed_file_path, index=False, encoding='utf-8-sig')
-    print(f"Processed data saved to {processed_file_path}")
+    # 시도청별로 그룹화하고 개수 세기
+    city_grouped_df = df.groupby('시도청').size().reset_index(name='count')
+    city_grouped_df.to_csv(city_grouped_file_path, index=False, encoding='utf-8-sig')
+    print(f"City grouped data saved to {city_grouped_file_path}")
 
 # S3로 데이터 업로드 함수
 def upload_to_s3(**kwargs):
     s3 = S3Hook(aws_conn_id='aws_default')  # S3 연결
+    
+    # 경찰서별로 그룹화된 파일 업로드
     s3.load_file(
-        filename='/tmp/processed_data.csv',  # 업로드할 파일 경로
-        key='upload/processed_data.csv',  # S3 키
+        filename='/tmp/police_station_grouped_data.csv',  # 업로드할 파일 경로
+        key='upload/police_station_grouped_data.csv',  # S3 키
         bucket_name='litchiimg',  # S3 버킷 이름
         replace=True  # 파일 교체
     )
-    print(f"File uploaded to s3://litchiimg/upload/processed_data.csv")
-
-# 테이블 생성 SQL
-create_table_sql = """
-CREATE TABLE IF NOT EXISTS public.police_station_count (
-    경찰서 VARCHAR(256),
-    count INTEGER
-);
-"""
+    print(f"File uploaded to s3://litchiimg/upload/police_station_grouped_data.csv")
+    
+    # 시도청별로 그룹화된 파일 업로드
+    s3.load_file(
+        filename='/tmp/city_grouped_data.csv',  # 업로드할 파일 경로
+        key='upload/city_grouped_data.csv',  # S3 키
+        bucket_name='litchiimg',  # S3 버킷 이름
+        replace=True  # 파일 교체
+    )
+    print(f"File uploaded to s3://litchiimg/upload/city_grouped_data.csv")
 
 # 태스크 정의
 fetch_data_task = PythonOperator(
@@ -88,17 +94,10 @@ upload_to_s3_task = PythonOperator(
     dag=dag,
 )
 
-create_table_task = PostgresOperator(
-    task_id='create_table',
-    postgres_conn_id='redshift_dev_db',  # Redshift 연결 ID
-    sql=create_table_sql,  # 실행할 SQL
-    dag=dag,
-)
-
-load_to_redshift_task = S3ToRedshiftOperator(
-    task_id='load_to_redshift',
+load_police_station_to_redshift_task = S3ToRedshiftOperator(
+    task_id='load_police_station_to_redshift',
     s3_bucket='litchiimg',  # S3 버킷
-    s3_key='upload/processed_data.csv',  # S3 키
+    s3_key='upload/police_station_grouped_data.csv',  # S3 키
     schema='public',  # Redshift 스키마
     table='police_station_count',  # Redshift 테이블
     copy_options=['csv', 'IGNOREHEADER 1'],  # COPY 옵션
@@ -107,5 +106,19 @@ load_to_redshift_task = S3ToRedshiftOperator(
     dag=dag,
 )
 
+load_city_to_redshift_task = S3ToRedshiftOperator(
+    task_id='load_city_to_redshift',
+    s3_bucket='litchiimg',  # S3 버킷
+    s3_key='upload/city_grouped_data.csv',  # S3 키
+    schema='public',  # Redshift 스키마
+    table='city_count',  # Redshift 테이블
+    copy_options=['csv', 'IGNOREHEADER 1'],  # COPY 옵션
+    aws_conn_id='aws_default',  # AWS 연결 ID
+    redshift_conn_id='redshift_dev_db',  # Redshift 연결 ID
+    dag=dag,
+)
+
 # 태스크 순서 설정
-fetch_data_task >> process_data_task >> upload_to_s3_task >> create_table_task >> load_to_redshift_task
+fetch_data_task >> process_data_task >> upload_to_s3_task
+upload_to_s3_task >> load_police_station_to_redshift_task
+upload_to_s3_task >> load_city_to_redshift_task
