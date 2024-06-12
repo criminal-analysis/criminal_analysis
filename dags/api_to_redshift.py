@@ -153,3 +153,8 @@ load_city_to_redshift_task = S3ToRedshiftOperator(
 # fetch_data_task >> process_data_task >> upload_to_s3_task
 # upload_to_s3_task >> create_police_station_table_task >> load_police_station_to_redshift_task
 # upload_to_s3_task >> create_city_table_task >> load_city_to_redshift_task
+
+# 태스크 순서 설정
+fetch_data_task >> process_data_task >> upload_to_s3_task
+upload_to_s3_task >> load_police_station_to_redshift_task
+upload_to_s3_task >> load_city_to_redshift_task
