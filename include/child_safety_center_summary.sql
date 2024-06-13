@@ -1,6 +1,6 @@
 --select * from hhee2864.child_safety_center where sido like '주소불명';
 
-DROP TABLE IF EXISTS hhee2864.summary_child_safety_center_iso;
+DROP TABLE IF EXISTS hhee2864.child_safety_center_iso;
 CREATE TABLE hhee2864.child_safety_center_iso AS 
 (
   SELECT
