@@ -1,6 +1,6 @@
 --select * from hhee2864.child_safety_center where sido like '주소불명';
 
-DROP TABLE IF EXISTS summary_child_safety_center_iso;
+DROP TABLE IF EXISTS hhee2864.summary_child_safety_center_iso;
 CREATE TABLE hhee2864.child_safety_center_iso AS 
 (
   SELECT
@@ -8,13 +8,13 @@ CREATE TABLE hhee2864.child_safety_center_iso AS
   FROM
     hhee2864.child_safety_center AS A
     LEFT JOIN
-      localname_iso_list AS B
+      hhee2864.localname_iso_list AS B
     ON
       A.sido = B.sido
 );
 DROP TABLE IF EXISTS hhee2864.child_safety_center;
 
-DROP TABLE IF EXISTS summary_child_safety_center;
+DROP TABLE IF EXISTS hhee2864.summary_child_safety_center;
 CREATE TABLE hhee2864.summary_child_safety_center AS
 (
   SELECT 
@@ -28,7 +28,7 @@ CREATE TABLE hhee2864.summary_child_safety_center AS
     SELECT 
       sido, iso_code, population
     FROM 
-      population_by_region
+      hhee2864.population_by_region
     WHERE 
       occured_date = (SELECT MAX(occured_date) FROM hhee2864.population_by_region)
   ) AS latest_pop
