@@ -105,7 +105,7 @@ def extract(url):
         total_count = get_raw_data_count(url, params, True)
         remote_total_count = get_raw_data_count(url, params, False)
 
-        if not path and total_count != remote_total_count:
+        if not path or total_count != remote_total_count:
             center_info = defaultdict(list)
             loopCount = remote_total_count // 100 + 1
             logging.info(f"loopCount: {loopCount}")
