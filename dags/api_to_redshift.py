@@ -41,7 +41,7 @@ def fetch_data_from_api(**kwargs):
 def process_data(**kwargs):
     raw_file_path = '/tmp/raw_data.csv'
     police_station_grouped_file_path = '/tmp/police_station_grouped_data.csv'
-    city_grouped_file_path = '/tmp/city_grouped_data.csv'
+    city_with_iso_file_path = '/tmp/city_with_iso_data.csv'
     
     df = pd.read_csv(raw_file_path, encoding='utf-8-sig')
     
@@ -59,8 +59,30 @@ def process_data(**kwargs):
     
     # 개수 세기
     city_grouped_df = df.groupby('시도').size().reset_index(name='count')
-    city_grouped_df.to_csv(city_grouped_file_path, index=False, encoding='utf-8-sig')
-    print(f"City grouped data saved to {city_grouped_file_path}")
+    
+    # ISO 코드 추가
+    iso_code_dict = {
+        "부산": "KR-26",
+        "충북": "KR-43",
+        "충남": "KR-44",
+        "대구": "KR-27",
+        "대전": "KR-30",
+        "강원": "KR-42",
+        "광주": "KR-29",
+        "경기": "KR-41",
+        "경북": "KR-47",
+        "경남": "KR-48",
+        "인천": "KR-28",
+        "제주": "KR-49",
+        "전북": "KR-45",
+        "전남": "KR-46",
+        "세종": "KR-50",
+        "서울": "KR-11",
+        "울산": "KR-31",
+    }
+    city_grouped_df['iso_code'] = city_grouped_df['시도'].map(iso_code_dict)
+    city_grouped_df.to_csv(city_with_iso_file_path, index=False, encoding='utf-8-sig')
+    print(f"City with ISO code data saved to {city_with_iso_file_path}")
 
 # S3로 데이터 업로드 함수
 def upload_to_s3(**kwargs):
@@ -75,14 +97,14 @@ def upload_to_s3(**kwargs):
     )
     print(f"File uploaded to s3://litchiimg/upload/police_station_grouped_data.csv")
     
-    # 시도청별로 그룹화된 파일 업로드
+    # ISO 코드가 포함된 시도청별 그룹화 데이터 업로드
     s3.load_file(
-        filename='/tmp/city_grouped_data.csv',  # 업로드할 파일 경로
-        key='upload/city_grouped_data.csv',  # S3 키
+        filename='/tmp/city_with_iso_data.csv',  # 업로드할 파일 경로
+        key='upload/city_with_iso_data.csv',  # S3 키
         bucket_name='litchiimg',  # S3 버킷 이름
         replace=True  # 파일 교체
     )
-    print(f"File uploaded to s3://litchiimg/upload/city_grouped_data.csv")
+    print(f"File uploaded to s3://litchiimg/upload/city_with_iso_data.csv")
 
 # 테이블 생성 SQL
 create_police_station_table_sql = """
@@ -92,16 +114,17 @@ CREATE TABLE IF NOT EXISTS hhee2864.police_station_count (
 );
 """
 
-create_city_table_sql = """
-CREATE TABLE IF NOT EXISTS hhee2864.city_count (
+create_city_with_iso_table_sql = """
+CREATE TABLE IF NOT EXISTS hhee2864.city_with_iso_count (
     시도청 VARCHAR(256),
-    count INTEGER
+    count INTEGER,
+    iso_code VARCHAR(10)
 );
 """
 
 # 테이블 데이터 삭제 SQL
 truncate_police_station_table_sql = "TRUNCATE TABLE hhee2864.police_station_count;"
-truncate_city_table_sql = "TRUNCATE TABLE hhee2864.city_count;"
+truncate_city_with_iso_table_sql = "TRUNCATE TABLE hhee2864.city_with_iso_count;"
 
 # 태스크 정의
 fetch_data_task = PythonOperator(
@@ -130,10 +153,10 @@ create_police_station_table_task = PostgresOperator(
     dag=dag,
 )
 
-create_city_table_task = PostgresOperator(
-    task_id='create_city_table',
+create_city_with_iso_table_task = PostgresOperator(
+    task_id='create_city_with_iso_table',
     postgres_conn_id='redshift_dev_db',  # Redshift 연결 ID
-    sql=create_city_table_sql,  # 실행할 SQL
+    sql=create_city_with_iso_table_sql,  # 실행할 SQL
     dag=dag,
 )
 
@@ -145,10 +168,10 @@ truncate_police_station_table_task = PostgresOperator(
     dag=dag,
 )
 
-truncate_city_table_task = PostgresOperator(
-    task_id='truncate_city_table',
+truncate_city_with_iso_table_task = PostgresOperator(
+    task_id='truncate_city_with_iso_table',
     postgres_conn_id='redshift_dev_db',  # Redshift 연결 ID
-    sql=truncate_city_table_sql,  # 실행할 SQL
+    sql=truncate_city_with_iso_table_sql,  # 실행할 SQL
     dag=dag,
 )
 
@@ -165,12 +188,12 @@ load_police_station_to_redshift_task = S3ToRedshiftOperator(
     dag=dag,
 )
 
-load_city_to_redshift_task = S3ToRedshiftOperator(
-    task_id='load_city_to_redshift',
+load_city_with_iso_to_redshift_task = S3ToRedshiftOperator(
+    task_id='load_city_with_iso_to_redshift',
     s3_bucket='litchiimg',  # S3 버킷
-    s3_key='upload/city_grouped_data.csv',  # S3 키
+    s3_key='upload/city_with_iso_data.csv',  # S3 키
     schema='hhee2864',  # Redshift 스키마
-    table='city_count',  # Redshift 테이블
+    table='city_with_iso_count',  # Redshift 테이블
     copy_options=['csv', 'IGNOREHEADER 1'],  # COPY 옵션
     aws_conn_id='aws_default',  # AWS 연결 ID
     redshift_conn_id='redshift_dev_db',  # Redshift 연결 ID
@@ -180,4 +203,4 @@ load_city_to_redshift_task = S3ToRedshiftOperator(
 # 태스크 순서 설정
 fetch_data_task >> process_data_task >> upload_to_s3_task
 upload_to_s3_task >> create_police_station_table_task >> truncate_police_station_table_task >> load_police_station_to_redshift_task
-upload_to_s3_task >> create_city_table_task >> truncate_city_table_task >> load_city_to_redshift_task
+upload_to_s3_task >> create_city_with_iso_table_task >> truncate_city_with_iso_table_task >> load_city_with_iso_to_redshift_task
