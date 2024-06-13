@@ -81,6 +81,13 @@ sheets = [
     },
     {
         "url": f"{Variable.get('gsheet_url_name_list')}",
+        "tab": "localname_iso_list",
+        "schema": "hhee2864",
+        "table": "localname_iso_list",
+        "table_schema": "sido varchar(6), iso_code varchar(10)"
+    },
+    {
+        "url": f"{Variable.get('gsheet_url_name_list')}",
         "tab": "phonenumber_list",
         "schema": "hhee2864",
         "table": "phonenumber_list",
