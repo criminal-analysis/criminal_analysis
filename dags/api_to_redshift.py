@@ -50,8 +50,15 @@ def process_data(**kwargs):
     police_station_grouped_df.to_csv(police_station_grouped_file_path, index=False, encoding='utf-8-sig')
     print(f"Police station grouped data saved to {police_station_grouped_file_path}")
     
-    # 시도청별로 그룹화하고 개수 세기
-    city_grouped_df = df.groupby('시도청').size().reset_index(name='count')
+    # 시도청별로 그룹화하고 개수 세기 (시도청명에서 "청" 부분 제거)
+    df['시도'] = df['시도청'].str.replace('청$', '', regex=True)
+    
+    # 경기남부와 경기북부를 경기로 합치기
+    df.loc[df['시도'] == '경기남부', '시도'] = '경기'
+    df.loc[df['시도'] == '경기북부', '시도'] = '경기'
+    
+    # 개수 세기
+    city_grouped_df = df.groupby('시도').size().reset_index(name='count')
     city_grouped_df.to_csv(city_grouped_file_path, index=False, encoding='utf-8-sig')
     print(f"City grouped data saved to {city_grouped_file_path}")
 
@@ -92,6 +99,10 @@ CREATE TABLE IF NOT EXISTS hhee2864.city_count (
 );
 """
 
+# 테이블 데이터 삭제 SQL
+truncate_police_station_table_sql = "TRUNCATE TABLE hhee2864.police_station_count;"
+truncate_city_table_sql = "TRUNCATE TABLE hhee2864.city_count;"
+
 # 태스크 정의
 fetch_data_task = PythonOperator(
     task_id='fetch_data_from_api',  # 태스크 ID
@@ -110,21 +121,38 @@ upload_to_s3_task = PythonOperator(
     python_callable=upload_to_s3,
     dag=dag,
 )
-#테이블 생성
-# create_police_station_table_task = PostgresOperator(
-#     task_id='create_police_station_table',
-#     postgres_conn_id='redshift_dev_db',  # Redshift 연결 ID
-#     sql=create_police_station_table_sql,  # 실행할 SQL
-#     dag=dag,
-# )
 
-# create_city_table_task = PostgresOperator(
-#     task_id='create_city_table',
-#     postgres_conn_id='redshift_dev_db',  # Redshift 연결 ID
-#     sql=create_city_table_sql,  # 실행할 SQL
-#     dag=dag,
-# )
+# 테이블 생성 태스크
+create_police_station_table_task = PostgresOperator(
+    task_id='create_police_station_table',
+    postgres_conn_id='redshift_dev_db',  # Redshift 연결 ID
+    sql=create_police_station_table_sql,  # 실행할 SQL
+    dag=dag,
+)
 
+create_city_table_task = PostgresOperator(
+    task_id='create_city_table',
+    postgres_conn_id='redshift_dev_db',  # Redshift 연결 ID
+    sql=create_city_table_sql,  # 실행할 SQL
+    dag=dag,
+)
+
+# 테이블 데이터 삭제 태스크
+truncate_police_station_table_task = PostgresOperator(
+    task_id='truncate_police_station_table',
+    postgres_conn_id='redshift_dev_db',  # Redshift 연결 ID
+    sql=truncate_police_station_table_sql,  # 실행할 SQL
+    dag=dag,
+)
+
+truncate_city_table_task = PostgresOperator(
+    task_id='truncate_city_table',
+    postgres_conn_id='redshift_dev_db',  # Redshift 연결 ID
+    sql=truncate_city_table_sql,  # 실행할 SQL
+    dag=dag,
+)
+
+# 데이터 로드 태스크
 load_police_station_to_redshift_task = S3ToRedshiftOperator(
     task_id='load_police_station_to_redshift',
     s3_bucket='litchiimg',  # S3 버킷
@@ -149,12 +177,7 @@ load_city_to_redshift_task = S3ToRedshiftOperator(
     dag=dag,
 )
 
-# 테이블 생성 태스크 순서 설정
-# fetch_data_task >> process_data_task >> upload_to_s3_task
-# upload_to_s3_task >> create_police_station_table_task >> load_police_station_to_redshift_task
-# upload_to_s3_task >> create_city_table_task >> load_city_to_redshift_task
-
 # 태스크 순서 설정
 fetch_data_task >> process_data_task >> upload_to_s3_task
-upload_to_s3_task >> load_police_station_to_redshift_task
-upload_to_s3_task >> load_city_to_redshift_task
+upload_to_s3_task >> create_police_station_table_task >> truncate_police_station_table_task >> load_police_station_to_redshift_task
+upload_to_s3_task >> create_city_table_task >> truncate_city_table_task >> load_city_to_redshift_task
