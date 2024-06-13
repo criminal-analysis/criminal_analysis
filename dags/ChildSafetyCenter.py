@@ -157,7 +157,8 @@ with DAG(
     default_args={
         'retries': 1,
         'retry_delay': timedelta(minutes=3),
-    }
+    },
+    template_searchpath=[f"{Variable.get('INCLUDE_DIR')}"],
 ) as dag:
 
     url = "https://www.safe182.go.kr/api/lcm/safeMap.do"
@@ -201,6 +202,15 @@ with DAG(
         dag = dag
     )
 
-    extract_transform_task = transform(extract(url))
-    extract_transform_task >> table_setting_task >> load_task
+    elt_task = SQLExecuteQueryOperator(
+        task_id = 'elt_task',
+        conn_id = "redshift_dev_db",
+        sql = "child_safety_center_summary.sql",
+        autocommit = True,
+        split_statements = True,
+        return_last = False,
+        dag = dag
+    )
 
+    extract_transform_task = transform(extract(url))
+    extract_transform_task >> table_setting_task >> load_task >> elt_task
