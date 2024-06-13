@@ -67,7 +67,7 @@ def download_raw_data(s3_conn_id, s3_bucket, s3_key, path):
     return download_path
 
 def update_sido_data(path):
-    raw_safety_center_df, local_name_df, zip_code_new_df, zip_code_old_df, phone_number_df = update_sido.load_data(path)
+    raw_safety_center_df, local_name_df, zip_code_new_df, zip_code_old_df = update_sido.load_data(path)
 
     raw_safety_center_df = update_sido.preprocess_data(raw_safety_center_df)
     raw_safety_center_df = update_sido.extract_city(raw_safety_center_df)

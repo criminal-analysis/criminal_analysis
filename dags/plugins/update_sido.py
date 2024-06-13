@@ -10,15 +10,13 @@ data_dir = Variable.get("DATA_DIR")
 local_name_path = data_dir + '/localname_list.csv'
 zip_code_new_path = data_dir + '/zipcode_new.csv'
 zip_code_old_path = data_dir + '/zipcode_old.csv'
-phone_number_path = data_dir + '/phonenumber_list.csv'
 
 def load_data(safety_center_path=data_dir + '/raw_safety_center_list.csv'):
     safety_center_df = pd.read_csv(safety_center_path)
     local_name_df = pd.read_csv(local_name_path)
     zip_code_new_df = pd.read_csv(zip_code_new_path)
     zip_code_old_df = pd.read_csv(zip_code_old_path)
-    phone_number_df = pd.read_csv(phone_number_path)
-    return (safety_center_df, local_name_df, zip_code_new_df, zip_code_old_df, phone_number_df)
+    return (safety_center_df, local_name_df, zip_code_new_df, zip_code_old_df)
 
 def preprocess_data(safety_center_df):
     # NaN 값을 빈 문자열로 대체
@@ -133,7 +131,7 @@ def save_to_csv(merged_df, output_path):
     return output_path if result is None else result
 
 if __name__ == "__main__":
-    raw_safety_center_df, local_name_df, zip_code_new_df, zip_code_old_df, phone_number_df = load_data()
+    raw_safety_center_df, local_name_df, zip_code_new_df, zip_code_old_df = load_data()
 
     raw_safety_center_df = preprocess_data(raw_safety_center_df)
     raw_safety_center_df = extract_city(raw_safety_center_df)
