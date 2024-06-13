@@ -1,6 +1,6 @@
 --select * from hhee2864.child_safety_center where sido like '주소불명';
 
-CREATE VIEW hhee2864.child_safety_center_iso AS 
+CREATE TABLE hhee2864.child_safety_center_iso AS 
 (
   SELECT
     A.*, B.iso_code
@@ -11,6 +11,7 @@ CREATE VIEW hhee2864.child_safety_center_iso AS
     ON
       A.sido = B.sido
 );
+DROP TABLE IF EXISTS hhee2864.child_safety_center;
 
 DROP TABLE IF EXISTS summary_child_safety_center;
 CREATE TABLE hhee2864.summary_child_safety_center AS
@@ -22,14 +23,14 @@ CREATE TABLE hhee2864.summary_child_safety_center AS
   FROM 
     hhee2864.child_safety_center_iso AS csci
   INNER JOIN 
-    (
-      SELECT 
-        sido, iso_code, population
-      FROM 
-        population_by_region
-      WHERE 
-        occured_date = (SELECT MAX(occured_date) FROM hhee2864.population_by_region)
-    ) AS latest_pop
+  (
+    SELECT 
+      sido, iso_code, population
+    FROM 
+      population_by_region
+    WHERE 
+      occured_date = (SELECT MAX(occured_date) FROM hhee2864.population_by_region)
+  ) AS latest_pop
   ON 
     csci.sido = latest_pop.sido
   GROUP BY 
