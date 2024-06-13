@@ -18,7 +18,7 @@ def load_data(safety_center_path=data_dir + '/raw_safety_center_list.csv'):
     zip_code_new_df = pd.read_csv(zip_code_new_path)
     zip_code_old_df = pd.read_csv(zip_code_old_path)
     phone_number_df = pd.read_csv(phone_number_path)
-    return safety_center_df, local_name_df, zip_code_new_df, zip_code_old_df, phone_number_df
+    return (safety_center_df, local_name_df, zip_code_new_df, zip_code_old_df, phone_number_df)
 
 def preprocess_data(safety_center_df):
     # NaN 값을 빈 문자열로 대체
@@ -60,7 +60,7 @@ def preprocess_zip_codes(zip_code_new_df, zip_code_old_df):
 
     zip_code_new_df = preprocess(zip_code_new_df)
     zip_code_old_df = preprocess(zip_code_old_df)
-    return zip_code_new_df, zip_code_old_df
+    return (zip_code_new_df, zip_code_old_df)
 
 def update_sido_by_zip(row, zip_code_new_df, zip_code_old_df):
     zip_code = str(row['zip']) if not pd.isna(row['zip']) else ''
@@ -115,6 +115,14 @@ def fill_missing_sido(merged_df):
     # 모든 주소를 확인할 수 없기에 부득이하게 결측값 처리
     merged_df['sido'] = merged_df['sido'].fillna('주소불명')
     return merged_df
+
+def get_local_rows_count(path=data_dir + '/raw_safety_center_list.csv'):
+    try:
+        rows = len(pd.read_csv(path))
+    except:
+        rows = 0
+    
+    return rows
 
 def save_to_csv(merged_df, output_path):
     # 최종 파일 저장

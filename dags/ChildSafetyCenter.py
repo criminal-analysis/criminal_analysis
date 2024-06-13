@@ -31,6 +31,20 @@ s3_bucket = "litchiimg"
 data_dir = Variable.get("DATA_DIR")
 
 
+def get_raw_data_count(url, params, is_local):
+    if is_local:
+        raw_count = update_sido.get_local_rows_count()
+    else:
+        first_info = requests.post(url, params=params)
+        if first_info.status_code != HTTPStatus.OK:
+            raise first_info.raise_for_status()
+        
+        first_data = first_info.json()
+        raw_count = first_data["totalCount"]
+
+    return raw_count
+
+
 def save_raw_data(data, path):
     df = pd.json_normalize(data)
     path = path + "/" + "raw_safety_center_list.csv"
@@ -44,9 +58,9 @@ def download_raw_data(s3_conn_id, s3_bucket, s3_key, path):
 
     if not download_path:
         if os.path.exists(origin_path):
-            if os.stat(origin_path).st_mtime < time.time() - 86400:
+            if os.stat(origin_path).st_mtime < time.time() - 43200:
                 os.remove(origin_path)
-                download_path = s3.download_to_s3(s3_conn_id, s3_bucket, s3_key, path)
+                download_path = None
             else:
                 download_path = origin_path
     
@@ -69,7 +83,7 @@ def update_sido_data(path):
     logging.info(f"missing counts: {merged_df[merged_df['sido'].isna()].count()}")
 
     path = update_sido.save_to_csv(merged_df, Variable.get("DATA_DIR") + '/' + 'updated_safety_center_list.csv')
-    return path
+    return (path, merged_df["serial_no"].count())
 
 @task
 def extract(url):
@@ -85,19 +99,15 @@ def extract(url):
     }
 
     try:
-        first_info = requests.post(url, params=params)
-        center_info = defaultdict(list)
-
-        if first_info.status_code != HTTPStatus.OK:
-            raise first_info.raise_for_status()
-        
-        first_data = first_info.json()
-        totalCount = first_data["totalCount"]
-
         s3_key = "upload" + "/" + "raw_safety_center_list.csv"
         path = download_raw_data(s3_conn_id, s3_bucket, s3_key, data_dir)
-        if not path:
-            loopCount = totalCount // 100 + 1
+
+        total_count = get_raw_data_count(url, params, True)
+        remote_total_count = get_raw_data_count(url, params, False)
+
+        if not path and total_count != remote_total_count:
+            center_info = defaultdict(list)
+            loopCount = remote_total_count // 100 + 1
             logging.info(f"loopCount: {loopCount}")
             params["pageUnit"] = 100
             
@@ -110,20 +120,27 @@ def extract(url):
                 center_info["list"].extend(data)
             
             path = save_raw_data(center_info["list"], data_dir)
+            total_count = get_raw_data_count(url, params, True)
+
             s3.upload_to_s3(s3_conn_id, s3_bucket, s3_key, [path], True)
 
     except (HTTPError, Exception) as e:
         logging.error(e)
         raise
 
-    return path
+    return (path, total_count)
 
 @task
-def transform(path):
+def transform(input_value):
     logging.info("Transform started")
+
+    path, total_count = input_value
     records = []
 
-    csv_path = update_sido_data(path)
+    csv_path, transform_count = update_sido_data(path)
+    if total_count != transform_count:
+        logging.error(f"raw data count {total_count} and transform data count {transform_count} is not same.")
+        raise ValueError
 
     s3_key = "upload" + "/" + "updated_safety_center_list.csv"
     s3.upload_to_s3(s3_conn_id, s3_bucket, s3_key, [csv_path], True)
@@ -170,7 +187,7 @@ with DAG(
         dag = dag
     )
 
-    load = S3ToRedshiftOperator(
+    load_task = S3ToRedshiftOperator(
         task_id = 'run_copy_sql_{}'.format(table_info["table_name"]),
         s3_bucket = s3_bucket,
         s3_key = "upload" + "/" + "updated_safety_center_list.csv",
@@ -184,7 +201,6 @@ with DAG(
         dag = dag
     )
 
-    extract_raw_data = extract(url) # '/opt/airflow/data/raw_safety_center_list.csv'
-    transformed_data = transform('/opt/airflow/data/raw_safety_center_list.csv')
+    extract_transform_task = transform(extract(url))
+    extract_transform_task >> table_setting_task >> load_task
 
-    extract_raw_data >> transformed_data >> table_setting_task >> load
