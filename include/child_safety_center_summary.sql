@@ -40,20 +40,20 @@ CREATE TABLE hhee2864.summary_child_safety_center AS
     count DESC
 );
 
-DROP TABLE IF EXISTS hhee2864.summary_child_safety_center_relative;
-CREATE TABLE hhee2864.summary_child_safety_center_relative AS
-(
-  SELECT
-    t.iso_code,
-    t.sido,
-    t.population,
-    t.count_ratio / (
-      SELECT SUM(count_ratio) 
-      FROM hhee2864.summary_child_safety_center
-    ) AS relative_ratio
-  FROM
-    hhee2864.summary_child_safety_center t;
-)
+-- DROP TABLE IF EXISTS hhee2864.summary_child_safety_center_relative;
+-- CREATE TABLE hhee2864.summary_child_safety_center_relative AS
+-- (
+--   SELECT
+--     t.iso_code,
+--     t.sido,
+--     t.population,
+--     t.count_ratio / (
+--       SELECT SUM(count_ratio) 
+--       FROM hhee2864.summary_child_safety_center
+--     ) AS relative_ratio
+--   FROM
+--     hhee2864.summary_child_safety_center t;
+-- )
 
 commit;
 
