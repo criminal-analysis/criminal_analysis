@@ -42,7 +42,7 @@ def api_get_upload_s3(url):
     
     s3_client.upload_file(file_name, bucket_name, key)
     logging.info("s3 upload done")
-    
+
 
 @task
 def extract():
@@ -71,55 +71,69 @@ def transform(obj):
     records = []
     category_dict = {"01": "강력범죄", "02": "절도범죄", "03": "폭력범죄", "07": "마약범죄", "10": "교통범죄"}
     do_dict = {
-        "수원시": "경기도", "고양시": "경기도", "용인시": "경기도", "과천시": "경기도", "광명시": "경기도", "광주시": "경기도", "구리시": "경기도", "군포시": "경기도", "김포시": "경기도", "남양주시": "경기도", "동두천시": "경기도", "부천시": "경기도", "성남시": "경기도", "시흥시": "경기도", "안산시": "경기도", "안성시": "경기도", "안양시": "경기도", "양주시": "경기도", "여주시": "경기도", "오산시": "경기도", "의왕시": "경기도", "의정부시": "경기도", "이천시": "경기도", "파주시": "경기도", "평택시": "경기도", "포천시": "경기도", "하남시": "경기도", "화성시": "경기도", # 경기도
-        "강릉시": "강원도", "동해시": "강원도", "삼척시": "강원도", "속초시": "강원도", "원주시": "강원도", "춘천시": "강원도", "태백시": "강원도", # 강원도
-        "제천시": "충청북도", "청주시": "충청북도", "충주시": "충청북도", # 충청북도
-        "계룡시": "충청남도", "공주시": "충청남도", "논산시": "충청남도",
-        "당진시": "충청남도", "보령시": "충청남도", "서산시": "충청남도", "아산시": "충청남도", "천안시": "충청남도", # 충청남도
-        "군산시": "전라북도", "김제시": "전라북도", "남원시": "전라북도", "익산시": "전라북도", "전주시": "전라북도", "정읍시": "전라북도",
-        "광양시": "전라남도", "나주시": "전라남도", "목포시": "전라남도", "순천시": "전라남도", "여수시": "전라남도", # 전라남도
-        "포항시": "경상북도", "경주시": "경상북도", "김천시": "경상북도", "안동시": "경상북도", "구미시": "경상북도", # 경상북도
-        "영주시": "경상북도", "영천시": "경상북도", "상주시": "경상북도", "문경시": "경상북도", "경산시": "경상북도",
-        "창원시": "경상남도", "진주시": "경상남도", "통영시": "경상남도", "사천시": "경상남도", "김해시": "경상남도", "밀양시": "경상남도", "거제시": "경상남도", "양산시": "경상남도", # 경상남도
-        "제주시": "제주특별자치도", "서귀포시": "제주특별자치도", # 제주특별자치도
+        "수원시": "경기", "고양시": "경기", "용인시": "경기", "과천시": "경기", "광명시": "경기", "광주시": "경기", "구리시": "경기", "군포시": "경기", "김포시": "경기", "남양주시": "경기", "동두천시": "경기", "부천시": "경기", "성남시": "경기", "시흥시": "경기", "안산시": "경기", "안성시": "경기", "안양시": "경기", "양주시": "경기", "여주시": "경기", "오산시": "경기", "의왕시": "경기", "의정부시": "경기", "이천시": "경기", "파주시": "경기", "평택시": "경기", "포천시": "경기", "하남시": "경기", "화성시": "경기", # 경기
+        "강릉시": "강원", "동해시": "강원", "삼척시": "강원", "속초시": "강원", "원주시": "강원", "춘천시": "강원", "태백시": "강원", # 강원
+        "제천시": "충북", "청주시": "충북", "충주시": "충북", # 충북
+        "계룡시": "충남", "공주시": "충남", "논산시": "충남", "당진시": "충남", "보령시": "충남", "서산시": "충남", "아산시": "충남", "천안시": "충남", # 충남
+        "군산시": "전북", "김제시": "전북", "남원시": "전북", "익산시": "전북", "전주시": "전북", "정읍시": "전북",
+        "광양시": "전남", "나주시": "전남", "목포시": "전남", "순천시": "전남", "여수시": "전남", # 전남
+        "포항시": "경북", "경주시": "경북", "김천시": "경북", "안동시": "경북", "구미시": "경북", # 경북
+        "영주시": "경북", "영천시": "경북", "상주시": "경북", "문경시": "경북", "경산시": "경북",
+        "창원시": "경남", "진주시": "경남", "통영시": "경남", "사천시": "경남", "김해시": "경남", "밀양시": "경남", "거제시": "경남", "양산시": "경남", # 경남
+        "제주시": "제주", "서귀포시": "제주", # 제주
     }
-    metropolitan_city = {
-        "서울": "서울특별시", "부산": "부산광역시", "광주": "광주광역시", "대구": "대구광역시",
-        "인천": "안천광역시", "대전": "대전광역시", "울산": "울산광역시", "세종": "세종특별자치시"
+    metropolitan_city = ["서울", "광주", "인천", "부산", "세종", "울산", "대구", "대전"] # 특별시, 광역시
+    iso_code_dict = {
+        "부산": "KR-26",
+        "충북": "KR-43",
+        "충남": "KR-44",
+        "대구": "KR-27",
+        "대전": "KR-30",
+        "강원": "KR-42",
+        "광주": "KR-29",
+        "경기": "KR-41",
+        "경북": "KR-47",
+        "경남": "KR-48",
+        "인천": "KR-28",
+        "제주": "KR-49",
+        "전북": "KR-45",
+        "전남": "KR-46",
+        "세종": "KR-50",
+        "서울": "KR-11",
+        "울산": "KR-31",
     }
-    
     for data in obj:
         occured_date = data["PRD_DE"]
-        
-        si = data["C2_NM"] # 도시명
+        sigungu = data["C2_NM"] # 도시명
         category_code = data["C1"]
-        if category_code == "01" or category_code == "03" or si == '기타도시' or si == '도시이외':
+        if category_code == "01" or category_code == "03" or sigungu == '기타도시' or sigungu == '도시이외':
             continue
         category = category_dict[category_code[0:2]]
         subcategory = data["C1_NM"]
         crime_count = data["DT"]
-        
         # crime_count가 '-' 인 경우
         if crime_count == '-' or crime_count == None:
             crime_count = 0
-        
         # 마산이나 진해는 창원으로 통합.
-        if si == '마산시' or si == '진해시':
-            si = '창원시'
-        if si in metropolitan_city:
-            do = metropolitan_city[si]
-            si = None
+        if sigungu == '마산시' or sigungu == '진해시':
+            sigungu = '창원시'
+        # 시도 / 시군구 분류.
+        if sigungu in metropolitan_city:
+            sido = sigungu
+            sigungu = None
         else:
-            do = do_dict[si]
+            sido = do_dict[sigungu]
+        iso_code = iso_code_dict[sido]
         
         records.append(
             [
                 int(occured_date),
-                do,
-                si,
+                sido,
+                sigungu,
                 int(crime_count),
                 category,
-                subcategory
+                subcategory,
+                iso_code
             ]
         ) # 범죄발생년도, 시도, 시군구, 발생건수, 범죄대분류, 범죄중분류
         
@@ -136,17 +150,20 @@ def load(schema, table, records):
         [ 발생년도, 시도, 시군구, 발생 건 수, 범죄대분류, 범죄중분류 ],
         [ 2022-01-01, 광역자치단체, 서울특별시, 35, 강력범죄, 살인기수],
         [ 2022-01-01, 광역자치단체, 부산광역시, 68, 강력범죄, 살인미수], 
-        [ 2022-01-01, 경기도, 고양시, 68, 강력범죄, 살인미수], 
+        [ 2022-01-01, 경기, 고양시, 68, 강력범죄, 살인미수], 
         ...
     ]
     """
-    create_table_sql = f"""CREATE TABLE IF NOT EXISTS {schema}.{table} (
+    
+    cur.execute(f"""DROP TABLE IF EXISTS {schema}.{table};""")
+    create_table_sql = f"""CREATE TABLE {schema}.{table} (
         occured_date int,
         sido varchar(30),
         sigungu varchar(30),
         crime_count int,
         category varchar(30),
-        subcategory varchar(30)
+        subcategory varchar(30),
+        iso_code varchar(30)
     );"""
     
     cur.execute(create_table_sql)
@@ -162,8 +179,11 @@ def load(schema, table, records):
             crime_count = r[3]
             category = r[4]
             subcategory = r[5]
-            sql = f"INSERT INTO {schema}.{table} VALUES ('{occured_date}', '{sido}', '{sigungu}', '{crime_count}', '{category}', '{subcategory}')"
-            print("insert done")
+            iso_code = r[6]
+            if sigungu == None:
+                sql = f"INSERT INTO {schema}.{table} VALUES ('{occured_date}', '{sido}', NULL, '{crime_count}', '{category}', '{subcategory}', '{iso_code}')"
+            else:
+                sql = f"INSERT INTO {schema}.{table} VALUES ('{occured_date}', '{sido}', '{sigungu}', '{crime_count}', '{category}', '{subcategory}', '{iso_code}')"
             cur.execute(sql)
         cur.execute("COMMIT;")   # cur.execute("END;") 
     except (Exception, psycopg2.DatabaseError) as error:
@@ -187,7 +207,7 @@ with DAG(
 
 
     url = Variable.get("api_url")
-    schema = 'joongh0113'   ## 자신의 스키마로 변경
+    schema = 'hhee2864'   ## 자신의 스키마로 변경
     table = 'crime_region'
     
     s3 = api_get_upload_s3(url)
