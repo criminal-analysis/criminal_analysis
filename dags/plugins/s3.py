@@ -19,7 +19,7 @@ def upload_to_s3(s3_conn_id, s3_bucket, s3_key, local_files_to_upload, replace):
             replace=replace
         )
 
-def download_to_s3(s3_conn_id, s3_bucket, s3_key, download_path):
+def download_from_s3(s3_conn_id, s3_bucket, s3_key, download_path):
     """
     Download the file in S3
     """

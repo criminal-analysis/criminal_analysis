@@ -123,7 +123,7 @@ def save_raw_data(data, path):
     return path
 
 def download_raw_data(s3_conn_id, s3_bucket, s3_key, path):
-    download_path = s3.download_to_s3(s3_conn_id, s3_bucket, s3_key, path)
+    download_path = s3.download_from_s3(s3_conn_id, s3_bucket, s3_key, path)
     origin_path = path + "/" + "raw_safety_center_list.csv"
 
     if not download_path:
